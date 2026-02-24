@@ -1,0 +1,24 @@
+# Logs and runtime data
+logs
+*.log
+npm-debug.log*
+pids
+*.pid
+
+# Dependency directories
+node_modules/
+jspm_packages/
+
+# Environment variables
+.env
+.env*.local
+
+# Build/output directories
+dist
+build
+.next
+.nuxt
+
+# IDE and cache
+.vscode-test
+.cache
