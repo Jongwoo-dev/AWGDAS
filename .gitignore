@@ -22,3 +22,6 @@ build
 # IDE and cache
 .vscode-test
 .cache
+
+# Claude Code
+.claude/
