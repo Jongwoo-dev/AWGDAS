@@ -24,4 +24,5 @@ build
 .cache
 
 # Claude Code
-.claude/
+.claude/*
+!.claude/skills/
