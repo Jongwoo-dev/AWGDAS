@@ -16,6 +16,7 @@ jspm_packages/
 # Build/output directories
 dist
 build
+output/
 .next
 .nuxt
 
