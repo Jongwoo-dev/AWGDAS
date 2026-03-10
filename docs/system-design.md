@@ -272,10 +272,10 @@ interface QAResult { // QA → PL
 
 ---
 ## 15. API 호출 방식
-- 기본 모델: `claude-sonnet-4-6` (`AWGDAS_MODEL`로 오버라이드, Key: `ANTHROPIC_API_KEY`)
+- 기본 모델: `claude-opus-4-6` (`AWGDAS_MODEL`로 오버라이드, Key: `ANTHROPIC_API_KEY`)
 - system prompt: 역할 정의 → 금지 사항(섹션 2) → 입출력 스키마 → JSON 응답 지시
 - tool_use: **Developer만** 파일 쓰기에 사용, 나머지는 텍스트 응답
-- max_tokens — PL: 2048, Planner: 4096, Developer: 8192, QA: 4096
+- max_tokens — PL: 4096, Planner: 16384, Developer: 32768, QA: 16384
 - 타임아웃 — PL: 30s, Planner: 60s, Developer: 120s, QA: 60s
 
 ---
