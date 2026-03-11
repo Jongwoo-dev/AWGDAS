@@ -1,8 +1,8 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
 // vi.hoisted로 mock 의존성을 hoisting하여 vi.mock factory에서 참조 가능하게 함
-const { mockCreate, errors } = vi.hoisted(() => {
-  const mockCreate = vi.fn();
+const { mockStream, errors } = vi.hoisted(() => {
+  const mockStream = vi.fn();
 
   class APIConnectionError extends Error {
     name = "APIConnectionError";
@@ -21,7 +21,7 @@ const { mockCreate, errors } = vi.hoisted(() => {
   }
 
   return {
-    mockCreate,
+    mockStream,
     errors: {
       APIConnectionError,
       RateLimitError,
@@ -34,7 +34,7 @@ const { mockCreate, errors } = vi.hoisted(() => {
 
 vi.mock("@anthropic-ai/sdk", () => ({
   default: class {
-    messages = { create: mockCreate };
+    messages = { stream: mockStream };
   },
   APIConnectionError: errors.APIConnectionError,
   RateLimitError: errors.RateLimitError,
@@ -86,6 +86,18 @@ function makeToolMessage() {
   });
 }
 
+function mockStreamResolve(msg: ReturnType<typeof makeMessage>) {
+  mockStream.mockReturnValueOnce({
+    finalMessage: () => Promise.resolve(msg),
+  });
+}
+
+function mockStreamReject(error: Error) {
+  mockStream.mockReturnValueOnce({
+    finalMessage: () => Promise.reject(error),
+  });
+}
+
 describe("getClient", () => {
   beforeEach(() => {
     resetClient();
@@ -108,7 +120,7 @@ describe("callAgent", () => {
   beforeEach(() => {
     vi.useFakeTimers();
     resetClient();
-    mockCreate.mockReset();
+    mockStream.mockReset();
   });
 
   afterEach(() => {
@@ -117,7 +129,7 @@ describe("callAgent", () => {
   });
 
   it("returns text from a successful API call", async () => {
-    mockCreate.mockResolvedValueOnce(makeMessage());
+    mockStreamResolve(makeMessage());
 
     const result = await callAgent({
       role: "pl",
@@ -139,14 +151,14 @@ describe("callAgent", () => {
     ];
 
     for (const { role, maxTokens } of roles) {
-      mockCreate.mockResolvedValueOnce(makeMessage());
+      mockStreamResolve(makeMessage());
       await callAgent({
         role,
         systemPrompt: "test",
         messages: [{ role: "user", content: "test" }],
       });
 
-      const callArgs = mockCreate.mock.calls.at(-1)![0];
+      const callArgs = mockStream.mock.calls.at(-1)![0];
       expect(callArgs.max_tokens).toBe(maxTokens);
     }
   });
@@ -160,24 +172,22 @@ describe("callAgent", () => {
     ];
 
     for (const { role, timeout } of roles) {
-      mockCreate.mockResolvedValueOnce(makeMessage());
+      mockStreamResolve(makeMessage());
       await callAgent({
         role,
         systemPrompt: "test",
         messages: [{ role: "user", content: "test" }],
       });
 
-      const options = mockCreate.mock.calls.at(-1)![1];
+      const options = mockStream.mock.calls.at(-1)![1];
       expect(options.timeout).toBe(timeout);
     }
   });
 
   it("throws if response contains no text block", async () => {
-    mockCreate.mockResolvedValueOnce(
-      makeMessage({
-        content: [{ type: "tool_use", id: "t1", name: "x", input: {} }],
-      }),
-    );
+    mockStreamResolve(makeMessage({
+      content: [{ type: "tool_use", id: "t1", name: "x", input: {} }],
+    }));
 
     await expect(
       callAgent({
@@ -189,9 +199,8 @@ describe("callAgent", () => {
   });
 
   it("retries on RateLimitError and succeeds", async () => {
-    mockCreate
-      .mockRejectedValueOnce(new errors.RateLimitError())
-      .mockResolvedValueOnce(makeMessage());
+    mockStreamReject(new errors.RateLimitError());
+    mockStreamResolve(makeMessage());
 
     const promise = callAgent({
       role: "pl",
@@ -203,13 +212,12 @@ describe("callAgent", () => {
     const result = await promise;
 
     expect(result.text).toBe('{"result":"ok"}');
-    expect(mockCreate).toHaveBeenCalledTimes(2);
+    expect(mockStream).toHaveBeenCalledTimes(2);
   });
 
   it("retries on APIConnectionError and succeeds", async () => {
-    mockCreate
-      .mockRejectedValueOnce(new errors.APIConnectionError())
-      .mockResolvedValueOnce(makeMessage());
+    mockStreamReject(new errors.APIConnectionError());
+    mockStreamResolve(makeMessage());
 
     const promise = callAgent({
       role: "pl",
@@ -224,9 +232,8 @@ describe("callAgent", () => {
   });
 
   it("retries on InternalServerError and succeeds", async () => {
-    mockCreate
-      .mockRejectedValueOnce(new errors.InternalServerError())
-      .mockResolvedValueOnce(makeMessage());
+    mockStreamReject(new errors.InternalServerError());
+    mockStreamResolve(makeMessage());
 
     const promise = callAgent({
       role: "pl",
@@ -241,10 +248,9 @@ describe("callAgent", () => {
   });
 
   it("throws after 3 failed retries", async () => {
-    mockCreate
-      .mockRejectedValueOnce(new errors.RateLimitError())
-      .mockRejectedValueOnce(new errors.RateLimitError())
-      .mockRejectedValueOnce(new errors.RateLimitError());
+    mockStreamReject(new errors.RateLimitError());
+    mockStreamReject(new errors.RateLimitError());
+    mockStreamReject(new errors.RateLimitError());
 
     const promise = callAgent({
       role: "pl",
@@ -260,11 +266,11 @@ describe("callAgent", () => {
     await vi.advanceTimersByTimeAsync(2000);
 
     await assertion;
-    expect(mockCreate).toHaveBeenCalledTimes(3);
+    expect(mockStream).toHaveBeenCalledTimes(3);
   });
 
   it("does not retry on BadRequestError", async () => {
-    mockCreate.mockRejectedValueOnce(new errors.BadRequestError());
+    mockStreamReject(new errors.BadRequestError());
 
     await expect(
       callAgent({
@@ -274,11 +280,11 @@ describe("callAgent", () => {
       }),
     ).rejects.toThrow();
 
-    expect(mockCreate).toHaveBeenCalledTimes(1);
+    expect(mockStream).toHaveBeenCalledTimes(1);
   });
 
   it("does not retry on AuthenticationError", async () => {
-    mockCreate.mockRejectedValueOnce(new errors.AuthenticationError());
+    mockStreamReject(new errors.AuthenticationError());
 
     await expect(
       callAgent({
@@ -288,12 +294,12 @@ describe("callAgent", () => {
       }),
     ).rejects.toThrow();
 
-    expect(mockCreate).toHaveBeenCalledTimes(1);
+    expect(mockStream).toHaveBeenCalledTimes(1);
   });
 
   it("uses AWGDAS_MODEL env var when set", async () => {
     process.env.AWGDAS_MODEL = "claude-opus-4-6";
-    mockCreate.mockResolvedValueOnce(makeMessage());
+    mockStreamResolve(makeMessage());
 
     await callAgent({
       role: "pl",
@@ -301,7 +307,7 @@ describe("callAgent", () => {
       messages: [{ role: "user", content: "test" }],
     });
 
-    const callArgs = mockCreate.mock.calls[0][0];
+    const callArgs = mockStream.mock.calls[0][0];
     expect(callArgs.model).toBe("claude-opus-4-6");
   });
 });
@@ -310,7 +316,7 @@ describe("callAgentWithTools", () => {
   beforeEach(() => {
     vi.useFakeTimers();
     resetClient();
-    mockCreate.mockReset();
+    mockStream.mockReset();
   });
 
   afterEach(() => {
@@ -318,7 +324,7 @@ describe("callAgentWithTools", () => {
   });
 
   it("returns content blocks including tool_use", async () => {
-    mockCreate.mockResolvedValueOnce(makeToolMessage());
+    mockStreamResolve(makeToolMessage());
 
     const result = await callAgentWithTools({
       role: "developer",
@@ -346,7 +352,7 @@ describe("callAgentWithTools", () => {
   });
 
   it("passes tools and tool_choice to API", async () => {
-    mockCreate.mockResolvedValueOnce(makeToolMessage());
+    mockStreamResolve(makeToolMessage());
 
     const tools = [
       {
@@ -365,15 +371,14 @@ describe("callAgentWithTools", () => {
       toolChoice,
     });
 
-    const callArgs = mockCreate.mock.calls[0][0];
+    const callArgs = mockStream.mock.calls[0][0];
     expect(callArgs.tools).toEqual(tools);
     expect(callArgs.tool_choice).toEqual(toolChoice);
   });
 
   it("retries on transient errors", async () => {
-    mockCreate
-      .mockRejectedValueOnce(new errors.RateLimitError())
-      .mockResolvedValueOnce(makeToolMessage());
+    mockStreamReject(new errors.RateLimitError());
+    mockStreamResolve(makeToolMessage());
 
     const promise = callAgentWithTools({
       role: "developer",
@@ -386,6 +391,6 @@ describe("callAgentWithTools", () => {
     const result = await promise;
 
     expect(result.content).toHaveLength(2);
-    expect(mockCreate).toHaveBeenCalledTimes(2);
+    expect(mockStream).toHaveBeenCalledTimes(2);
   });
 });

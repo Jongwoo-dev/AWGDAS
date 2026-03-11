@@ -119,8 +119,8 @@ export async function callAgent(
   const client = getClient();
 
   const message = await executeWithRetry(
-    () =>
-      client.messages.create(
+    async () => {
+      const stream = client.messages.stream(
         {
           model: getModel(),
           max_tokens: config.maxTokens,
@@ -128,7 +128,9 @@ export async function callAgent(
           messages: params.messages,
         },
         { timeout: config.timeout },
-      ),
+      );
+      return stream.finalMessage();
+    },
     params.role,
   );
 
@@ -155,8 +157,8 @@ export async function callAgentWithTools(
   const client = getClient();
 
   const message = await executeWithRetry(
-    () =>
-      client.messages.create(
+    async () => {
+      const stream = client.messages.stream(
         {
           model: getModel(),
           max_tokens: config.maxTokens,
@@ -166,7 +168,9 @@ export async function callAgentWithTools(
           tool_choice: params.toolChoice,
         },
         { timeout: config.timeout },
-      ),
+      );
+      return stream.finalMessage();
+    },
     params.role,
   );
 
