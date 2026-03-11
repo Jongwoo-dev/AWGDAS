@@ -155,7 +155,7 @@ describe("callAgent", () => {
     const roles = [
       { role: "pl" as const, timeout: 30_000 },
       { role: "planner" as const, timeout: 60_000 },
-      { role: "developer" as const, timeout: 120_000 },
+      { role: "developer" as const, timeout: 600_000 },
       { role: "qa" as const, timeout: 60_000 },
     ];
 

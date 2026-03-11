@@ -40,7 +40,7 @@ const DEFAULT_MODEL = "claude-opus-4-6";
 const AGENT_CONFIGS: Record<AgentRole, AgentConfig> = {
   pl: { model: DEFAULT_MODEL, maxTokens: 4096, timeout: 30_000 },
   planner: { model: DEFAULT_MODEL, maxTokens: 16_384, timeout: 60_000 },
-  developer: { model: DEFAULT_MODEL, maxTokens: 32_768, timeout: 120_000 },
+  developer: { model: DEFAULT_MODEL, maxTokens: 32_768, timeout: 600_000 },
   qa: { model: DEFAULT_MODEL, maxTokens: 16_384, timeout: 60_000 },
 };
 
