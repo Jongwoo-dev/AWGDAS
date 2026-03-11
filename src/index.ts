@@ -1,3 +1,4 @@
+import "dotenv/config";
 import * as readline from "node:readline/promises";
 import { stdin, stdout } from "node:process";
 import { createLogger } from "./utils/logger.js";
