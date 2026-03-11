@@ -7,12 +7,26 @@ import {
   transition,
   setSpec,
   setBreakdown,
+  setDevResult,
 } from "./utils/roundStateMachine.js";
 import { getModel } from "./utils/anthropicClient.js";
+import { ensureOutputDir } from "./utils/fileManager.js";
 import { runPLInit } from "./agents/plAgent.js";
 import { runPlanner } from "./agents/plannerAgent.js";
+import { runDeveloper } from "./agents/developerAgent.js";
 
 const logger = createLogger({ agent: "pipeline" });
+
+function slugify(text: string): string {
+  const slug = text
+    .toLowerCase()
+    .replace(/[<>:"/\\|?*]/g, "")
+    .replace(/\s+/g, "-")
+    .replace(/-+/g, "-")
+    .replace(/^-|-$/g, "")
+    .slice(0, 50);
+  return slug || `game-${Date.now()}`;
+}
 
 async function readGameDescription(): Promise<string> {
   const rl = readline.createInterface({ input: stdin, output: stdout });
@@ -62,11 +76,27 @@ async function main(): Promise<void> {
     features: breakdown.features.length,
   });
 
+  // PLANNER_DEFINE → DEV_IMPLEMENT
+  state = transition(state, "DEV_IMPLEMENT");
+  logger.info("State transition", { phase: state.phase });
+
+  // DEV_IMPLEMENT
+  const gameName = slugify(gameDescription);
+  await ensureOutputDir(gameName);
+  const devResult = await runDeveloper(breakdown, gameName, false);
+  state = setDevResult(state, devResult);
+  logger.info("Phase complete: DEV_IMPLEMENT", {
+    features: devResult.implementedFeatures.length,
+    files: devResult.changedFiles.length,
+  });
+
   // 결과 출력
   stdout.write("\n=== RoundSpec ===\n");
   stdout.write(JSON.stringify(spec, null, 2));
   stdout.write("\n\n=== FeatureBreakdown ===\n");
   stdout.write(JSON.stringify(breakdown, null, 2));
+  stdout.write("\n\n=== DevResult ===\n");
+  stdout.write(JSON.stringify(devResult, null, 2));
   stdout.write("\n");
 
   logger.info("Pipeline completed successfully", {
