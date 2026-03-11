@@ -53,7 +53,7 @@ const logger = createLogger({ agent: "anthropicClient" });
 
 let clientInstance: Anthropic | null = null;
 
-function getModel(): string {
+export function getModel(): string {
   return process.env.AWGDAS_MODEL ?? DEFAULT_MODEL;
 }
 

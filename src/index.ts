@@ -8,6 +8,7 @@ import {
   setSpec,
   setBreakdown,
 } from "./utils/roundStateMachine.js";
+import { getModel } from "./utils/anthropicClient.js";
 import { runPLInit } from "./agents/plAgent.js";
 import { runPlanner } from "./agents/plannerAgent.js";
 
@@ -26,7 +27,7 @@ async function readGameDescription(): Promise<string> {
 }
 
 async function main(): Promise<void> {
-  logger.info("AWGDAS pipeline started");
+  logger.info("AWGDAS pipeline started", { model: getModel() });
 
   const gameDescription = await readGameDescription();
   if (!gameDescription) {
