@@ -1,7 +1,7 @@
 import type { RoundSpec, RoundState, QAResult } from "../types/index.js";
 import { callAgent } from "../utils/anthropicClient.js";
 import { createLogger } from "../utils/logger.js";
-import { parseJsonResponse } from "../utils/parseJson.js";
+import { parseAndValidate } from "../utils/responseParser.js";
 import { canRetry } from "../utils/roundStateMachine.js";
 import { PL_SYSTEM_PROMPT } from "./prompts/index.js";
 
@@ -29,7 +29,14 @@ export async function runPLInit(
     outputTokens: response.usage.outputTokens,
   });
 
-  const spec = parseJsonResponse<RoundSpec>(response.text, "PL RoundSpec");
+  const spec = parseAndValidate<RoundSpec>(response.text, "PL RoundSpec", [
+    "roundId",
+    "gameDescription",
+    "features",
+    "acceptanceCriteria",
+    "scopeLock",
+    "maxRetries",
+  ]);
 
   logger.info("RoundSpec parsed", {
     features: spec.features.length,
@@ -76,5 +83,23 @@ export function generateFailReport(
 
   const maxRetries = state.currentSpec?.maxRetries ?? 0;
 
-  return `[ROUND ${state.roundId} FAILED] Phase:${state.phase} | Retry:${state.retryCount}/${maxRetries} | Reason:${reason} | Failed:${failedACs}`;
+  const w = 42;
+  const line = "═".repeat(w);
+  const pad = (s: string) => {
+    const trimmed = s.slice(0, w - 2);
+    return trimmed + " ".repeat(w - 2 - trimmed.length);
+  };
+  const title = `ROUND ${state.roundId} — FAILED`;
+  const titlePad = " ".repeat(Math.max(0, Math.floor((w - 2 - title.length) / 2)));
+
+  return [
+    `╔${line}╗`,
+    `║${titlePad}${title}${" ".repeat(w - 2 - titlePad.length - title.length)}║`,
+    `╠${line}╣`,
+    `║ ${pad(`Phase    : ${state.phase}`)} ║`,
+    `║ ${pad(`Retries  : ${state.retryCount}/${maxRetries}`)} ║`,
+    `║ ${pad(`Reason   : ${reason}`)} ║`,
+    `║ ${pad(`Failed AC: ${failedACs}`)} ║`,
+    `╚${line}╝`,
+  ].join("\n");
 }

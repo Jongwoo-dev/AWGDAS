@@ -11,8 +11,8 @@ vi.mock("../utils/anthropicClient.js", () => ({
   callAgent: vi.fn(),
 }));
 
-vi.mock("../utils/parseJson.js", () => ({
-  parseJsonResponse: vi.fn(),
+vi.mock("../utils/responseParser.js", () => ({
+  parseAndValidate: vi.fn(),
 }));
 
 vi.mock("../utils/logger.js", () => ({
@@ -268,7 +268,8 @@ describe("Pipeline data contract: QA → PL judgment (REJECT → FAIL)", () => {
     expect(state.phase).toBe("FAILED");
 
     const report = generateFailReport(state, "QA rejected all retries");
-    expect(report).toContain("[ROUND 1 FAILED]");
-    expect(report).toContain("Retry:2/2");
+    expect(report).toContain("ROUND 1");
+    expect(report).toContain("FAILED");
+    expect(report).toContain("Retries  : 2/2");
   });
 });

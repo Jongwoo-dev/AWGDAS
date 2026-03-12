@@ -11,7 +11,7 @@ import {
   setQAResult,
   incrementRetry,
 } from "./utils/roundStateMachine.js";
-import { getModel } from "./utils/anthropicClient.js";
+import { getModel, abortAllRequests, AgentCallError } from "./utils/anthropicClient.js";
 import { ensureOutputDir } from "./utils/fileManager.js";
 import { runPLInit, evaluateQAResult, generateFailReport } from "./agents/plAgent.js";
 import { runPlanner } from "./agents/plannerAgent.js";
@@ -19,6 +19,20 @@ import { runDeveloper } from "./agents/developerAgent.js";
 import { runQA } from "./agents/qaAgent.js";
 
 const logger = createLogger({ agent: "pipeline" });
+
+let shutdownRequested = false;
+
+function setupGracefulShutdown(): void {
+  process.on("SIGINT", () => {
+    if (shutdownRequested) {
+      logger.warn("Force shutdown requested");
+      process.exit(1);
+    }
+    shutdownRequested = true;
+    logger.info("Graceful shutdown requested (SIGINT). Waiting for current operation...");
+    abortAllRequests();
+  });
+}
 
 function slugify(text: string): string {
   const slug = text
@@ -44,6 +58,7 @@ async function readGameDescription(): Promise<string> {
 }
 
 async function main(): Promise<void> {
+  setupGracefulShutdown();
   logger.info("AWGDAS pipeline started", { model: getModel() });
 
   const gameDescription = await readGameDescription();
@@ -183,6 +198,10 @@ async function main(): Promise<void> {
 }
 
 main().catch((error: unknown) => {
+  if (error instanceof AgentCallError && error.category === "timeout" && shutdownRequested) {
+    logger.info("Pipeline aborted by user (SIGINT)");
+    process.exit(130);
+  }
   logger.error("Pipeline failed", {
     error: error instanceof Error ? error.message : String(error),
   });

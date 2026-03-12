@@ -5,8 +5,8 @@ vi.mock("../../utils/anthropicClient.js", () => ({
   callAgent: vi.fn(),
 }));
 
-vi.mock("../../utils/parseJson.js", () => ({
-  parseJsonResponse: vi.fn((text: string) => JSON.parse(text)),
+vi.mock("../../utils/responseParser.js", () => ({
+  parseAndValidate: vi.fn((text: string) => JSON.parse(text)),
 }));
 
 vi.mock("../../utils/logger.js", () => ({
@@ -21,10 +21,10 @@ vi.mock("../../utils/logger.js", () => ({
 
 import { runPlanner } from "../plannerAgent.js";
 import { callAgent } from "../../utils/anthropicClient.js";
-import { parseJsonResponse } from "../../utils/parseJson.js";
+import { parseAndValidate } from "../../utils/responseParser.js";
 
 const mockCallAgent = vi.mocked(callAgent);
-const mockParseJson = vi.mocked(parseJsonResponse);
+const mockParseAndValidate = vi.mocked(parseAndValidate);
 
 function makeSpec(): RoundSpec {
   return {
@@ -88,12 +88,12 @@ describe("runPlanner", () => {
     expect(args.messages[0].content).toBe(JSON.stringify(spec));
   });
 
-  it("propagates parseJsonResponse errors", async () => {
+  it("propagates parseAndValidate errors", async () => {
     mockCallAgent.mockResolvedValueOnce({
       text: "not-json",
       usage: { inputTokens: 200, outputTokens: 100 },
     });
-    mockParseJson.mockImplementationOnce(() => {
+    mockParseAndValidate.mockImplementationOnce(() => {
       throw new Error("Failed to parse JSON");
     });
 

@@ -1,7 +1,7 @@
 import type { RoundSpec, FeatureBreakdown } from "../types/index.js";
 import { callAgent } from "../utils/anthropicClient.js";
 import { createLogger } from "../utils/logger.js";
-import { parseJsonResponse } from "../utils/parseJson.js";
+import { parseAndValidate } from "../utils/responseParser.js";
 import { PLANNER_SYSTEM_PROMPT } from "./prompts/index.js";
 
 const logger = createLogger({ agent: "planner" });
@@ -27,9 +27,10 @@ export async function runPlanner(
     outputTokens: response.usage.outputTokens,
   });
 
-  const breakdown = parseJsonResponse<FeatureBreakdown>(
+  const breakdown = parseAndValidate<FeatureBreakdown>(
     response.text,
     "Planner FeatureBreakdown",
+    ["roundId", "fileStructure", "features"],
   );
 
   logger.info("FeatureBreakdown parsed", {

@@ -5,8 +5,8 @@ vi.mock("../../utils/anthropicClient.js", () => ({
   callAgent: vi.fn(),
 }));
 
-vi.mock("../../utils/parseJson.js", () => ({
-  parseJsonResponse: vi.fn((text: string) => JSON.parse(text)),
+vi.mock("../../utils/responseParser.js", () => ({
+  parseAndValidate: vi.fn((text: string) => JSON.parse(text)),
 }));
 
 vi.mock("../../utils/logger.js", () => ({

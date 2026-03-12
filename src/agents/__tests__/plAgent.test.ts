@@ -5,8 +5,8 @@ vi.mock("../../utils/anthropicClient.js", () => ({
   callAgent: vi.fn(),
 }));
 
-vi.mock("../../utils/parseJson.js", () => ({
-  parseJsonResponse: vi.fn((text: string) => JSON.parse(text)),
+vi.mock("../../utils/responseParser.js", () => ({
+  parseAndValidate: vi.fn((text: string) => JSON.parse(text)),
 }));
 
 vi.mock("../../utils/logger.js", () => ({
@@ -154,10 +154,10 @@ describe("generateFailReport", () => {
 
     const report = generateFailReport(state, "QA rejected");
 
-    expect(report).toContain("[ROUND 1 FAILED]");
-    expect(report).toContain("Phase:FAILED");
-    expect(report).toContain("Retry:2/2");
-    expect(report).toContain("Reason:QA rejected");
+    expect(report).toContain("ROUND 1");
+    expect(report).toContain("FAILED");
+    expect(report).toContain("Retries  : 2/2");
+    expect(report).toContain("Reason   : QA rejected");
     expect(report).toContain("AC2");
     expect(report).toContain("AC3");
   });
@@ -171,7 +171,7 @@ describe("generateFailReport", () => {
 
     const report = generateFailReport(state, "Unknown error");
 
-    expect(report).toContain("Failed:N/A");
-    expect(report).toContain("Retry:0/0");
+    expect(report).toContain("Failed AC: N/A");
+    expect(report).toContain("Retries  : 0/0");
   });
 });

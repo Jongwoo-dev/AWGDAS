@@ -1,7 +1,7 @@
 import type { DevResult, RoundSpec, QAResult, Manifest } from "../types/index.js";
 import { callAgent } from "../utils/anthropicClient.js";
 import { createLogger } from "../utils/logger.js";
-import { parseJsonResponse } from "../utils/parseJson.js";
+import { parseAndValidate } from "../utils/responseParser.js";
 import { readManifest } from "../utils/manifest.js";
 import { readGameFile, gameFileExists } from "../utils/fileManager.js";
 import { QA_SYSTEM_PROMPT } from "./prompts/index.js";
@@ -120,7 +120,12 @@ export async function runQA(
     outputTokens: response.usage.outputTokens,
   });
 
-  const qaResult = parseJsonResponse<QAResult>(response.text, "QA QAResult");
+  const qaResult = parseAndValidate<QAResult>(response.text, "QA QAResult", [
+    "roundId",
+    "verdict",
+    "fileIntegrity",
+    "results",
+  ]);
 
   if (!integrity) {
     qaResult.fileIntegrity = false;

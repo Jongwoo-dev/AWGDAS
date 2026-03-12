@@ -9,7 +9,7 @@ import type {
 } from "../types/index.js";
 import { callAgentWithTools } from "../utils/anthropicClient.js";
 import { createLogger } from "../utils/logger.js";
-import { parseJsonResponse } from "../utils/parseJson.js";
+import { parseAndValidate } from "../utils/responseParser.js";
 import {
   writeGameFile,
   readGameFile,
@@ -271,9 +271,10 @@ export async function runDeveloper(
         throw new Error("Developer returned no text in final response");
       }
 
-      const devResult = parseJsonResponse<DevResult>(
+      const devResult = parseAndValidate<DevResult>(
         textBlock.text,
         "Developer DevResult",
+        ["roundId", "implementedFeatures", "summary", "changedFiles"],
       );
 
       logger.info("DevResult parsed", {

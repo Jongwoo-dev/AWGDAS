@@ -48,6 +48,8 @@ import {
   resetClient,
   callAgent,
   callAgentWithTools,
+  abortAllRequests,
+  AgentCallError,
 } from "../anthropicClient.js";
 
 function makeMessage(overrides: Record<string, unknown> = {}) {
@@ -392,5 +394,104 @@ describe("callAgentWithTools", () => {
 
     expect(result.content).toHaveLength(2);
     expect(mockStream).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe("AgentCallError wrapping", () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+    resetClient();
+    mockStream.mockReset();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("wraps non-retryable errors in AgentCallError", async () => {
+    mockStreamReject(new errors.BadRequestError());
+
+    try {
+      await callAgent({
+        role: "pl",
+        systemPrompt: "test",
+        messages: [{ role: "user", content: "test" }],
+      });
+      expect.unreachable("should have thrown");
+    } catch (e) {
+      expect(e).toBeInstanceOf(AgentCallError);
+      const err = e as AgentCallError;
+      expect(err.role).toBe("pl");
+      expect(err.category).toBe("unknown");
+    }
+  });
+
+  it("wraps retryable errors in AgentCallError after max retries", async () => {
+    mockStreamReject(new errors.APIConnectionError());
+    mockStreamReject(new errors.APIConnectionError());
+    mockStreamReject(new errors.APIConnectionError());
+
+    const promise = callAgent({
+      role: "planner",
+      systemPrompt: "test",
+      messages: [{ role: "user", content: "test" }],
+    });
+
+    const assertion = expect(promise).rejects.toSatisfy((e: unknown) => {
+      const err = e as AgentCallError;
+      return err instanceof AgentCallError && err.category === "network" && err.role === "planner";
+    });
+
+    await vi.advanceTimersByTimeAsync(1000);
+    await vi.advanceTimersByTimeAsync(2000);
+    await assertion;
+  });
+});
+
+describe("AbortController signal", () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+    resetClient();
+    mockStream.mockReset();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("passes signal in stream options", async () => {
+    mockStreamResolve(makeMessage());
+
+    await callAgent({
+      role: "pl",
+      systemPrompt: "test",
+      messages: [{ role: "user", content: "test" }],
+    });
+
+    const options = mockStream.mock.calls[0][1];
+    expect(options.signal).toBeInstanceOf(AbortSignal);
+  });
+
+  it("abortAllRequests aborts in-flight calls", async () => {
+    mockStream.mockReturnValueOnce({
+      finalMessage: () =>
+        new Promise((_resolve, reject) => {
+          setTimeout(() => reject(new DOMException("Aborted", "AbortError")), 100);
+        }),
+    });
+
+    const promise = callAgent({
+      role: "pl",
+      systemPrompt: "test",
+      messages: [{ role: "user", content: "test" }],
+    });
+
+    // rejection handler를 먼저 연결하여 unhandled rejection 방지
+    const assertion = expect(promise).rejects.toBeInstanceOf(AgentCallError);
+
+    abortAllRequests();
+    await vi.advanceTimersByTimeAsync(200);
+
+    await assertion;
   });
 });

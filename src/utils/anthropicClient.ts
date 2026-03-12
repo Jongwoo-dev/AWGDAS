@@ -10,6 +10,7 @@ import { createLogger } from "./logger.js";
 // ── 타입 정의 ────────────────────────────────────────────
 
 export type AgentRole = "pl" | "planner" | "developer" | "qa";
+export type ErrorCategory = "network" | "api" | "timeout" | "unknown";
 
 export interface CallAgentParams {
   role: AgentRole;
@@ -33,6 +34,20 @@ export interface ToolAgentResponse {
   usage: { inputTokens: number; outputTokens: number };
 }
 
+// ── 커스텀 에러 ──────────────────────────────────────────
+
+export class AgentCallError extends Error {
+  constructor(
+    public readonly role: AgentRole,
+    public readonly category: ErrorCategory,
+    public readonly originalError: Error,
+  ) {
+    super(`Agent ${role} call failed [${category}]: ${originalError.message}`);
+    this.name = "AgentCallError";
+    this.cause = originalError;
+  }
+}
+
 // ── 상수 ─────────────────────────────────────────────────
 
 const DEFAULT_MODEL = "claude-opus-4-6";
@@ -52,6 +67,7 @@ const BACKOFF_DELAYS = [1000, 2000, 4000];
 const logger = createLogger({ agent: "anthropicClient" });
 
 let clientInstance: Anthropic | null = null;
+let globalAbortController: AbortController | null = null;
 
 export function getModel(): string {
   return process.env.AWGDAS_MODEL ?? DEFAULT_MODEL;
@@ -63,6 +79,24 @@ function isRetryableError(error: unknown): boolean {
     error instanceof RateLimitError ||
     error instanceof InternalServerError
   );
+}
+
+function isAbortError(error: unknown): boolean {
+  if (error instanceof Error && error.name === "AbortError") return true;
+  if (error instanceof DOMException && error.name === "AbortError") return true;
+  return false;
+}
+
+function classifyError(error: unknown): ErrorCategory {
+  if (isAbortError(error)) return "timeout";
+  if (error instanceof APIConnectionError) return "network";
+  if (
+    error instanceof RateLimitError ||
+    error instanceof InternalServerError
+  ) {
+    return "api";
+  }
+  return "unknown";
 }
 
 export function sleep(ms: number): Promise<void> {
@@ -80,12 +114,17 @@ async function executeWithRetry(
       const isLast = attempt === MAX_RETRIES - 1;
 
       if (!isRetryableError(error) || isLast) {
+        const category = classifyError(error);
         logger.error(`Agent ${role} API call failed`, {
           attempt: attempt + 1,
-          retryable: isRetryableError(error),
+          category,
           error: error instanceof Error ? error.message : String(error),
         });
-        throw error;
+        throw new AgentCallError(
+          role,
+          category,
+          error instanceof Error ? error : new Error(String(error)),
+        );
       }
 
       const delay = BACKOFF_DELAYS[attempt];
@@ -110,6 +149,19 @@ export function getClient(): Anthropic {
 
 export function resetClient(): void {
   clientInstance = null;
+  globalAbortController = null;
+}
+
+export function getGlobalAbortSignal(): AbortSignal {
+  if (!globalAbortController) {
+    globalAbortController = new AbortController();
+  }
+  return globalAbortController.signal;
+}
+
+export function abortAllRequests(): void {
+  globalAbortController?.abort();
+  globalAbortController = new AbortController();
 }
 
 export async function callAgent(
@@ -120,16 +172,28 @@ export async function callAgent(
 
   const message = await executeWithRetry(
     async () => {
-      const stream = client.messages.stream(
-        {
-          model: getModel(),
-          max_tokens: config.maxTokens,
-          system: params.systemPrompt,
-          messages: params.messages,
-        },
-        { timeout: config.timeout },
-      );
-      return stream.finalMessage();
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), config.timeout);
+      try {
+        const globalSignal = getGlobalAbortSignal();
+        if (globalSignal.aborted) controller.abort();
+        globalSignal.addEventListener("abort", () => controller.abort(), {
+          once: true,
+        });
+
+        const stream = client.messages.stream(
+          {
+            model: getModel(),
+            max_tokens: config.maxTokens,
+            system: params.systemPrompt,
+            messages: params.messages,
+          },
+          { timeout: config.timeout, signal: controller.signal },
+        );
+        return await stream.finalMessage();
+      } finally {
+        clearTimeout(timeoutId);
+      }
     },
     params.role,
   );
@@ -158,18 +222,30 @@ export async function callAgentWithTools(
 
   const message = await executeWithRetry(
     async () => {
-      const stream = client.messages.stream(
-        {
-          model: getModel(),
-          max_tokens: config.maxTokens,
-          system: params.systemPrompt,
-          messages: params.messages,
-          tools: params.tools,
-          tool_choice: params.toolChoice,
-        },
-        { timeout: config.timeout },
-      );
-      return stream.finalMessage();
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), config.timeout);
+      try {
+        const globalSignal = getGlobalAbortSignal();
+        if (globalSignal.aborted) controller.abort();
+        globalSignal.addEventListener("abort", () => controller.abort(), {
+          once: true,
+        });
+
+        const stream = client.messages.stream(
+          {
+            model: getModel(),
+            max_tokens: config.maxTokens,
+            system: params.systemPrompt,
+            messages: params.messages,
+            tools: params.tools,
+            tool_choice: params.toolChoice,
+          },
+          { timeout: config.timeout, signal: controller.signal },
+        );
+        return await stream.finalMessage();
+      } finally {
+        clearTimeout(timeoutId);
+      }
     },
     params.role,
   );
