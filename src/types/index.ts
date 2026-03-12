@@ -104,6 +104,19 @@ export interface Manifest {
   files: ManifestFile[];
 }
 
+// ── 파이프라인 통계 ──────────────────────────────────────
+
+export interface PipelineStats {
+  model: string;
+  totalInputTokens: number;
+  totalOutputTokens: number;
+  totalApiCalls: number;
+  qaCycles: number;
+  retryCount: number;
+  elapsed: string;
+  elapsedMs: number;
+}
+
 // ── 에이전트 설정 ────────────────────────────────────────
 
 export interface AgentConfig {

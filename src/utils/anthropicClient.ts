@@ -138,6 +138,28 @@ async function executeWithRetry(
   throw new Error("Retry logic error: unreachable");
 }
 
+// ── 사용량 추적 ─────────────────────────────────────────
+
+let _totalInputTokens = 0;
+let _totalOutputTokens = 0;
+let _totalApiCalls = 0;
+
+export function resetUsageTracker(): void {
+  _totalInputTokens = 0;
+  _totalOutputTokens = 0;
+  _totalApiCalls = 0;
+}
+
+function recordUsage(inputTokens: number, outputTokens: number): void {
+  _totalInputTokens += inputTokens;
+  _totalOutputTokens += outputTokens;
+  _totalApiCalls += 1;
+}
+
+export function getAccumulatedUsage(): { totalInputTokens: number; totalOutputTokens: number; totalApiCalls: number } {
+  return { totalInputTokens: _totalInputTokens, totalOutputTokens: _totalOutputTokens, totalApiCalls: _totalApiCalls };
+}
+
 // ── 공개 API ─────────────────────────────────────────────
 
 export function getClient(): Anthropic {
@@ -150,6 +172,7 @@ export function getClient(): Anthropic {
 export function resetClient(): void {
   clientInstance = null;
   globalAbortController = null;
+  resetUsageTracker();
 }
 
 export function getGlobalAbortSignal(): AbortSignal {
@@ -205,6 +228,8 @@ export async function callAgent(
     throw new Error(`Agent ${params.role} returned no text content`);
   }
 
+  recordUsage(message.usage.input_tokens, message.usage.output_tokens);
+
   return {
     text: textBlock.text,
     usage: {
@@ -249,6 +274,8 @@ export async function callAgentWithTools(
     },
     params.role,
   );
+
+  recordUsage(message.usage.input_tokens, message.usage.output_tokens);
 
   return {
     content: message.content,

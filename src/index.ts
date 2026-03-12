@@ -11,7 +11,8 @@ import {
   setQAResult,
   incrementRetry,
 } from "./utils/roundStateMachine.js";
-import { getModel, abortAllRequests, AgentCallError } from "./utils/anthropicClient.js";
+import { getModel, abortAllRequests, AgentCallError, resetUsageTracker, getAccumulatedUsage } from "./utils/anthropicClient.js";
+import type { PipelineStats } from "./types/index.js";
 import { ensureOutputDir } from "./utils/fileManager.js";
 import { runPLInit, evaluateQAResult, generateFailReport } from "./agents/plAgent.js";
 import { runPlanner } from "./agents/plannerAgent.js";
@@ -45,6 +46,14 @@ function slugify(text: string): string {
   return slug || `game-${Date.now()}`;
 }
 
+function formatElapsed(ms: number): string {
+  const totalSec = Math.floor(ms / 1000);
+  const min = Math.floor(totalSec / 60);
+  const sec = totalSec % 60;
+  if (min === 0) return `${sec}초`;
+  return `${min}분 ${sec}초`;
+}
+
 async function readGameDescription(): Promise<string> {
   const rl = readline.createInterface({ input: stdin, output: stdout });
   try {
@@ -66,6 +75,9 @@ async function main(): Promise<void> {
     logger.error("Empty game description");
     process.exit(1);
   }
+
+  const startTime = Date.now();
+  resetUsageTracker();
 
   logger.info("Game description received", {
     length: gameDescription.length,
@@ -188,12 +200,34 @@ async function main(): Promise<void> {
     stdout.write("\n\n=== QAResult ===\n");
     stdout.write(JSON.stringify(state.currentQAResult, null, 2));
   }
-  stdout.write("\n");
+
+  // 파이프라인 실행 통계
+  const elapsedMs = Date.now() - startTime;
+  const usage = getAccumulatedUsage();
+  const qaCycles = 1 + state.retryCount;
+  const stats: PipelineStats = {
+    model: getModel(),
+    totalInputTokens: usage.totalInputTokens,
+    totalOutputTokens: usage.totalOutputTokens,
+    totalApiCalls: usage.totalApiCalls,
+    qaCycles,
+    retryCount: state.retryCount,
+    elapsed: formatElapsed(elapsedMs),
+    elapsedMs,
+  };
+
+  stdout.write("\n\n=== 파이프라인 실행 통계 ===\n");
+  stdout.write(`  사용 모델:       ${stats.model}\n`);
+  stdout.write(`  입력 토큰:       ${stats.totalInputTokens.toLocaleString()}\n`);
+  stdout.write(`  출력 토큰:       ${stats.totalOutputTokens.toLocaleString()}\n`);
+  stdout.write(`  API 호출 수:     ${stats.totalApiCalls}\n`);
+  stdout.write(`  QA 검증 횟수:    ${stats.qaCycles} (재시도 ${stats.retryCount}회)\n`);
+  stdout.write(`  총 소요 시간:    ${stats.elapsed}\n`);
 
   logger.info("Pipeline completed", {
     finalPhase: state.phase,
     verdict: finalVerdict,
-    retries: state.retryCount,
+    ...stats,
   });
 }
 
