@@ -8,6 +8,7 @@ import { QA_SYSTEM_PROMPT } from "./prompts/index.js";
 
 const logger = createLogger({ agent: "qa" });
 
+/** 매니페스트에 등록된 파일의 실제 존재 여부를 검증한다. */
 async function checkFileIntegrity(
   manifest: Manifest,
   gameName: string,
@@ -27,6 +28,7 @@ async function checkFileIntegrity(
   };
 }
 
+/** 매니페스트의 모든 파일 내용을 읽어 반환한다. 읽기 실패 시 "[FILE NOT FOUND]"로 대체한다. */
 async function readAllGameFiles(
   manifest: Manifest,
   gameName: string,
@@ -45,6 +47,7 @@ async function readAllGameFiles(
   return fileContents;
 }
 
+/** QA 에이전트에 전달할 사용자 메시지를 조립한다. */
 function buildUserMessage(
   devResult: DevResult,
   spec: RoundSpec,
@@ -80,6 +83,17 @@ function buildUserMessage(
   return parts.join("\n\n");
 }
 
+/**
+ * 개발 결과를 수락 기준에 따라 검증한다.
+ * 파일 무결성 실패 시 verdict를 자동으로 REJECT로 강제한다.
+ *
+ * @param devResult - Developer의 구현 결과
+ * @param spec - PL이 생성한 라운드 스펙
+ * @param gameName - 게임 이름 (출력 디렉토리명)
+ * @returns 파싱 및 검증된 QAResult
+ * @throws AgentCallError - API 호출 실패 시
+ * @throws ResponseParseError | ValidationError - 응답 파싱 실패 시
+ */
 export async function runQA(
   devResult: DevResult,
   spec: RoundSpec,

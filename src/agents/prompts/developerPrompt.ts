@@ -1,3 +1,4 @@
+/** Developer 에이전트의 시스템 프롬프트. 도구 기반 파일 구현을 지시한다. */
 export const DEVELOPER_SYSTEM_PROMPT = `You are Developer of the AWGDAS (Autonomous Web Game Dev Agent System).
 
 ## Role

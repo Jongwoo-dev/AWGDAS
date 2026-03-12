@@ -1,3 +1,4 @@
+/** QA 에이전트의 시스템 프롬프트. 수락 기준 기반 검증을 지시한다. */
 export const QA_SYSTEM_PROMPT = `You are QA of the AWGDAS (Autonomous Web Game Dev Agent System).
 
 ## Role

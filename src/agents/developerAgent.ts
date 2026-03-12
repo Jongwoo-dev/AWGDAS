@@ -27,8 +27,10 @@ import { DEVELOPER_SYSTEM_PROMPT } from "./prompts/index.js";
 
 const logger = createLogger({ agent: "developer" });
 
+/** 무한 루프 방지를 위한 도구 호출 최대 반복 횟수. */
 const MAX_TOOL_LOOPS = 50;
 
+/** Developer 에이전트에 제공하는 파일 조작 도구 정의. */
 const TOOLS: Anthropic.Tool[] = [
   {
     name: "write_file",
@@ -69,11 +71,13 @@ const TOOLS: Anthropic.Tool[] = [
   },
 ];
 
+/** 도구 호출 시 전달되는 입력 파라미터. */
 interface ToolInput {
   path: string;
   content?: string;
 }
 
+/** 파일 경로로부터 FileRole을 추론한다. */
 function inferRole(filePath: string): FileRole {
   if (filePath === "index.html") return "entry";
   if (filePath.endsWith(".html")) return "entry";
@@ -89,6 +93,7 @@ function inferRole(filePath: string): FileRole {
   return "feature";
 }
 
+/** 파일을 작성하고 trackedFiles와 매니페스트를 갱신한다. */
 async function handleWriteFile(
   gameName: string,
   roundId: number,
@@ -113,6 +118,7 @@ async function handleWriteFile(
   return `File ${action}: ${filePath}`;
 }
 
+/** 파일 내용을 읽어 반환한다. */
 async function handleReadFile(
   gameName: string,
   input: ToolInput,
@@ -122,6 +128,7 @@ async function handleReadFile(
   return content;
 }
 
+/** 파일을 삭제하고 trackedFiles와 매니페스트를 갱신한다. */
 async function handleDeleteFile(
   gameName: string,
   roundId: number,
@@ -139,6 +146,7 @@ async function handleDeleteFile(
   return `File deleted: ${input.path}`;
 }
 
+/** 파일 액션에 따라 매니페스트를 생성하거나 갱신한다. */
 async function updateManifest(
   gameName: string,
   roundId: number,
@@ -178,6 +186,7 @@ async function updateManifest(
   }
 }
 
+/** 단일 도구 호출을 실행하고 ToolResultBlockParam을 반환한다. */
 async function processToolUse(
   gameName: string,
   roundId: number,
@@ -225,6 +234,18 @@ async function processToolUse(
   }
 }
 
+/**
+ * FeatureBreakdown에 따라 게임 파일을 구현한다.
+ * 도구 루프를 통해 파일을 생성/수정/삭제하고, 최종 DevResult를 반환한다.
+ *
+ * @param breakdown - Planner가 생성한 기능 분해
+ * @param gameName - 게임 이름 (출력 디렉토리명)
+ * @param isRetry - 재시도 여부
+ * @param qaFeedback - 재시도 시 이전 QA 결과 (수정 대상 피드백)
+ * @returns 파싱 및 검증된 DevResult
+ * @throws AgentCallError - API 호출 실패 시
+ * @throws 도구 루프가 MAX_TOOL_LOOPS를 초과할 경우 Error
+ */
 export async function runDeveloper(
   breakdown: FeatureBreakdown,
   gameName: string,
@@ -285,7 +306,7 @@ export async function runDeveloper(
       return devResult;
     }
 
-    // tool_use: process all tool calls
+    // tool_use: 모든 도구 호출을 순차 처리
     const toolUseBlocks = response.content.filter(
       (b): b is Anthropic.ToolUseBlock => b.type === "tool_use",
     );
@@ -307,7 +328,7 @@ export async function runDeveloper(
       toolResults.push(result);
     }
 
-    // assistant turn (content from API) + user turn (tool results)
+    // assistant turn (API 응답) + user turn (도구 결과)
     messages.push({ role: "assistant", content: response.content });
     messages.push({ role: "user", content: toolResults });
   }

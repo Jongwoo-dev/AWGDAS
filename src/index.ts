@@ -23,6 +23,7 @@ const logger = createLogger({ agent: "pipeline" });
 
 let shutdownRequested = false;
 
+/** SIGINT 시그널을 처리하여 진행 중인 API 호출을 중단한다. */
 function setupGracefulShutdown(): void {
   process.on("SIGINT", () => {
     if (shutdownRequested) {
@@ -35,6 +36,7 @@ function setupGracefulShutdown(): void {
   });
 }
 
+/** 게임 설명을 파일 시스템에 안전한 디렉토리명으로 변환한다. */
 function slugify(text: string): string {
   const slug = text
     .toLowerCase()
@@ -46,6 +48,7 @@ function slugify(text: string): string {
   return slug || `game-${Date.now()}`;
 }
 
+/** 밀리초를 "분 초" 형태의 한국어 문자열로 변환한다. */
 function formatElapsed(ms: number): string {
   const totalSec = Math.floor(ms / 1000);
   const min = Math.floor(totalSec / 60);
@@ -54,6 +57,7 @@ function formatElapsed(ms: number): string {
   return `${min}분 ${sec}초`;
 }
 
+/** stdin에서 게임 설명을 대화형으로 입력받는다. */
 async function readGameDescription(): Promise<string> {
   const rl = readline.createInterface({ input: stdin, output: stdout });
   try {
@@ -66,6 +70,10 @@ async function readGameDescription(): Promise<string> {
   }
 }
 
+/**
+ * AWGDAS 파이프라인 메인 진입점.
+ * PL_INIT → PLANNER_DEFINE → DEV_IMPLEMENT → QA_REVIEW 루프를 실행한다.
+ */
 async function main(): Promise<void> {
   setupGracefulShutdown();
   logger.info("AWGDAS pipeline started", { model: getModel() });

@@ -1,3 +1,4 @@
+/** Planner 에이전트의 시스템 프롬프트. 기능 분해를 지시한다. */
 export const PLANNER_SYSTEM_PROMPT = `You are Planner of the AWGDAS (Autonomous Web Game Dev Agent System).
 
 ## Role

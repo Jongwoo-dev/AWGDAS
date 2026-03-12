@@ -3,6 +3,7 @@ import { readGameFile, writeGameFile } from "./fileManager.js";
 
 const MANIFEST_FILENAME = "manifest.json";
 
+/** manifest.json을 게임 디렉토리에 기록한다. */
 async function writeManifest(
   gameName: string,
   manifest: Manifest,
@@ -16,6 +17,15 @@ async function writeManifest(
   );
 }
 
+/**
+ * 초기 파일 하나로 새 매니페스트를 생성한다.
+ *
+ * @param gameName - 게임 이름
+ * @param roundId - 현재 라운드 ID
+ * @param firstFile - 매니페스트에 등록할 첫 번째 파일
+ * @param baseDir - 출력 기본 디렉토리
+ * @returns 생성된 Manifest
+ */
 export async function createManifest(
   gameName: string,
   roundId: number,
@@ -31,6 +41,13 @@ export async function createManifest(
   return manifest;
 }
 
+/**
+ * 게임 디렉토리에서 manifest.json을 읽어 파싱한다.
+ *
+ * @param gameName - 게임 이름
+ * @param baseDir - 출력 기본 디렉토리
+ * @returns 파싱된 Manifest
+ */
 export async function readManifest(
   gameName: string,
   baseDir?: string,
@@ -39,6 +56,16 @@ export async function readManifest(
   return JSON.parse(raw) as Manifest;
 }
 
+/**
+ * 매니페스트에 새 파일을 추가한다.
+ *
+ * @param gameName - 게임 이름
+ * @param roundId - 현재 라운드 ID
+ * @param file - 추가할 파일 정보
+ * @param baseDir - 출력 기본 디렉토리
+ * @returns 갱신된 Manifest
+ * @throws 이미 동일 경로의 파일이 존재할 경우 Error
+ */
 export async function addFileToManifest(
   gameName: string,
   roundId: number,
@@ -58,6 +85,17 @@ export async function addFileToManifest(
   return manifest;
 }
 
+/**
+ * 매니페스트에서 파일의 설명을 갱신한다.
+ *
+ * @param gameName - 게임 이름
+ * @param roundId - 현재 라운드 ID
+ * @param filePath - 갱신할 파일 경로
+ * @param newDescription - 새 설명
+ * @param baseDir - 출력 기본 디렉토리
+ * @returns 갱신된 Manifest
+ * @throws 해당 경로의 파일이 매니페스트에 없을 경우 Error
+ */
 export async function updateFileInManifest(
   gameName: string,
   roundId: number,
@@ -78,6 +116,16 @@ export async function updateFileInManifest(
   return manifest;
 }
 
+/**
+ * 매니페스트에서 파일을 제거한다.
+ *
+ * @param gameName - 게임 이름
+ * @param roundId - 현재 라운드 ID
+ * @param filePath - 제거할 파일 경로
+ * @param baseDir - 출력 기본 디렉토리
+ * @returns 갱신된 Manifest
+ * @throws 해당 경로의 파일이 매니페스트에 없을 경우 Error
+ */
 export async function removeFileFromManifest(
   gameName: string,
   roundId: number,

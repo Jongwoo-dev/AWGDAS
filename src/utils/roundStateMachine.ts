@@ -7,6 +7,7 @@ import type {
   QAResult,
 } from "../types/index.js";
 
+/** 페이즈 간 허용된 전이 맵. */
 const VALID_TRANSITIONS: Map<RoundPhase, RoundPhase[]> = new Map([
   ["PL_INIT", ["PLANNER_DEFINE"]],
   ["PLANNER_DEFINE", ["DEV_IMPLEMENT"]],
@@ -16,6 +17,12 @@ const VALID_TRANSITIONS: Map<RoundPhase, RoundPhase[]> = new Map([
   ["RELEASE", ["DONE"]],
 ]);
 
+/**
+ * 초기 상태의 RoundState를 생성한다.
+ *
+ * @param roundId - 라운드 식별자
+ * @returns PL_INIT 페이즈의 초기 RoundState
+ */
 export function createRoundState(roundId: number): RoundState {
   return {
     roundId,
@@ -29,6 +36,14 @@ export function createRoundState(roundId: number): RoundState {
   };
 }
 
+/**
+ * 현재 페이즈에서 다음 페이즈로 전이한다.
+ *
+ * @param state - 현재 RoundState
+ * @param nextPhase - 전이할 대상 페이즈
+ * @returns 전이된 새 RoundState
+ * @throws 허용되지 않은 전이이거나 재시도 한도 초과 시 Error
+ */
 export function transition(
   state: RoundState,
   nextPhase: RoundPhase,
@@ -52,6 +67,7 @@ export function transition(
   return { ...state, phase: nextPhase };
 }
 
+/** 현재 상태에서 재시도 가능 여부를 반환한다. */
 export function canRetry(state: RoundState): boolean {
   if (!state.currentSpec) {
     return false;
@@ -59,14 +75,17 @@ export function canRetry(state: RoundState): boolean {
   return state.retryCount < state.currentSpec.maxRetries;
 }
 
+/** retryCount를 1 증가시킨 새 상태를 반환한다. */
 export function incrementRetry(state: RoundState): RoundState {
   return { ...state, retryCount: state.retryCount + 1 };
 }
 
+/** RoundState에 RoundSpec을 설정한 새 상태를 반환한다. */
 export function setSpec(state: RoundState, spec: RoundSpec): RoundState {
   return { ...state, currentSpec: spec };
 }
 
+/** RoundState에 FeatureBreakdown을 설정한 새 상태를 반환한다. */
 export function setBreakdown(
   state: RoundState,
   breakdown: FeatureBreakdown,
@@ -74,6 +93,7 @@ export function setBreakdown(
   return { ...state, currentBreakdown: breakdown };
 }
 
+/** RoundState에 DevResult를 설정한 새 상태를 반환한다. */
 export function setDevResult(
   state: RoundState,
   devResult: DevResult,
@@ -81,6 +101,7 @@ export function setDevResult(
   return { ...state, currentDevResult: devResult };
 }
 
+/** RoundState에 QAResult를 설정한 새 상태를 반환한다. */
 export function setQAResult(
   state: RoundState,
   qaResult: QAResult,
@@ -88,6 +109,7 @@ export function setQAResult(
   return { ...state, currentQAResult: qaResult };
 }
 
+/** 백로그에 항목을 추가한 새 상태를 반환한다. */
 export function addToBacklog(state: RoundState, item: string): RoundState {
   return { ...state, backlog: [...state.backlog, item] };
 }

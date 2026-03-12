@@ -1,3 +1,4 @@
+/** PL(프로젝트 리드) 에이전트의 시스템 프롬프트. 라운드 스펙 생성을 지시한다. */
 export const PL_SYSTEM_PROMPT = `You are PL (Project Lead) of the AWGDAS (Autonomous Web Game Dev Agent System).
 
 ## Role

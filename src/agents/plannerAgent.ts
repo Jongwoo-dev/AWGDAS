@@ -6,6 +6,14 @@ import { PLANNER_SYSTEM_PROMPT } from "./prompts/index.js";
 
 const logger = createLogger({ agent: "planner" });
 
+/**
+ * RoundSpec을 기반으로 기능 분해(FeatureBreakdown)를 생성한다.
+ *
+ * @param spec - PL이 생성한 라운드 스펙
+ * @returns 파싱 및 검증된 FeatureBreakdown
+ * @throws AgentCallError - API 호출 실패 시
+ * @throws ResponseParseError | ValidationError - 응답 파싱 실패 시
+ */
 export async function runPlanner(
   spec: RoundSpec,
 ): Promise<FeatureBreakdown> {
