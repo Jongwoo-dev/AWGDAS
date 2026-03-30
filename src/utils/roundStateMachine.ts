@@ -5,6 +5,8 @@ import type {
   FeatureBreakdown,
   DevResult,
   QAResult,
+  PipelineContext,
+  PhaseHandler,
 } from "../types/index.js";
 
 /** 페이즈 간 허용된 전이 맵. */
@@ -112,4 +114,46 @@ export function setQAResult(
 /** 백로그에 항목을 추가한 새 상태를 반환한다. */
 export function addToBacklog(state: RoundState, item: string): RoundState {
   return { ...state, backlog: [...state.backlog, item] };
+}
+
+// ── 상태 머신 디스패처 ──────────────────────────────────
+
+/** 페이즈별 핸들러 레지스트리. */
+const PHASE_HANDLERS = new Map<RoundPhase, PhaseHandler>();
+
+/** 페이즈에 핸들러를 등록한다. */
+export function registerPhaseHandler(
+  phase: RoundPhase,
+  handler: PhaseHandler,
+): void {
+  PHASE_HANDLERS.set(phase, handler);
+}
+
+/**
+ * 현재 페이즈에 등록된 핸들러를 실행하여 다음 상태를 반환한다.
+ *
+ * @param state - 현재 RoundState
+ * @param context - 파이프라인 실행 컨텍스트
+ * @returns 핸들러가 반환한 다음 RoundState
+ * @throws 핸들러가 등록되지 않은 페이즈일 때 Error
+ */
+export async function runPhase(
+  state: RoundState,
+  context: PipelineContext,
+): Promise<RoundState> {
+  const handler = PHASE_HANDLERS.get(state.phase);
+  if (!handler) {
+    throw new Error(`No handler registered for phase: ${state.phase}`);
+  }
+  return handler(state, context);
+}
+
+/** 터미널 페이즈(DONE, FAILED) 여부를 반환한다. */
+export function isTerminalPhase(phase: RoundPhase): boolean {
+  return phase === "DONE" || phase === "FAILED";
+}
+
+/** 핸들러 레지스트리를 초기화한다. 테스트 전용. */
+export function clearPhaseHandlers(): void {
+  PHASE_HANDLERS.clear();
 }

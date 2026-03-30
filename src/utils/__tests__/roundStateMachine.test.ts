@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, beforeEach } from "vitest";
 import type {
   RoundState,
   RoundSpec,
@@ -16,6 +16,10 @@ import {
   setDevResult,
   setQAResult,
   addToBacklog,
+  registerPhaseHandler,
+  runPhase,
+  isTerminalPhase,
+  clearPhaseHandlers,
 } from "../roundStateMachine.js";
 
 const makeSpec = (maxRetries = 2): RoundSpec => ({
@@ -305,5 +309,58 @@ describe("data slot setters", () => {
     expect(next2.backlog).toEqual(["item-1", "item-2"]);
     expect(state.backlog).toEqual([]);
     expect(next1.backlog).toEqual(["item-1"]);
+  });
+});
+
+describe("isTerminalPhase", () => {
+  it("returns true for DONE", () => {
+    expect(isTerminalPhase("DONE")).toBe(true);
+  });
+
+  it("returns true for FAILED", () => {
+    expect(isTerminalPhase("FAILED")).toBe(true);
+  });
+
+  it("returns false for PL_INIT", () => {
+    expect(isTerminalPhase("PL_INIT")).toBe(false);
+  });
+
+  it("returns false for QA_REVIEW", () => {
+    expect(isTerminalPhase("QA_REVIEW")).toBe(false);
+  });
+});
+
+describe("registerPhaseHandler / runPhase", () => {
+  beforeEach(() => {
+    clearPhaseHandlers();
+  });
+
+  it("throws when no handler is registered for the current phase", async () => {
+    const state = createRoundState(1);
+    await expect(runPhase(state, { gameDescription: "test", gameName: "test" }))
+      .rejects.toThrow("No handler registered for phase: PL_INIT");
+  });
+
+  it("dispatches the registered handler and returns the next state", async () => {
+    const state = createRoundState(1);
+    registerPhaseHandler("PL_INIT", async (s) => {
+      return { ...s, phase: "PLANNER_DEFINE" as const };
+    });
+
+    const next = await runPhase(state, { gameDescription: "test", gameName: "test" });
+    expect(next.phase).toBe("PLANNER_DEFINE");
+  });
+
+  it("passes context to the handler", async () => {
+    const state = createRoundState(1);
+    let receivedCtx = { gameDescription: "", gameName: "" };
+    registerPhaseHandler("PL_INIT", async (s, ctx) => {
+      receivedCtx = ctx;
+      return { ...s, phase: "PLANNER_DEFINE" as const };
+    });
+
+    await runPhase(state, { gameDescription: "my game", gameName: "my-game" });
+    expect(receivedCtx.gameDescription).toBe("my game");
+    expect(receivedCtx.gameName).toBe("my-game");
   });
 });

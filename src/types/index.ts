@@ -146,6 +146,20 @@ export interface PipelineStats {
   elapsedMs: number;
 }
 
+// ── 상태 머신 ───────────────────────────────────────────
+
+/** 파이프라인 실행 컨텍스트. 상태 머신 외부의 불변 데이터. */
+export interface PipelineContext {
+  readonly gameDescription: string;
+  readonly gameName: string;
+}
+
+/** 페이즈 핸들러 함수 시그니처. 현재 상태를 받아 다음 상태를 반환한다. */
+export type PhaseHandler = (
+  state: RoundState,
+  context: PipelineContext,
+) => Promise<RoundState>;
+
 // ── 에이전트 설정 ────────────────────────────────────────
 
 /** 에이전트별 API 호출 설정. */
