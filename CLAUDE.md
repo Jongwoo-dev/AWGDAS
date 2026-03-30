@@ -26,6 +26,7 @@ AWGDAS (Autonomous Web Game Dev Agent System) — 사용자 입력으로부터 �
 /AWGDAS
   ├── src/
   │   ├── agents/          # 에이전트 구현 (pl, planner, developer, qa)
+  │   ├── pipeline/        # 상태 머신 페이즈 핸들러 등록
   │   ├── types/           # 공유 TypeScript 인터페이스
   │   ├── utils/           # 공통 유틸리티
   │   └── index.ts         # 진입점
@@ -72,6 +73,7 @@ npm run typecheck
 
 ### 파일 분리 원칙
 - 에이전트마다 파일 1개 (`src/agents/`)
+- 페이즈 핸들러는 `src/pipeline/`에 등록
 - 공유 타입은 `src/types/index.ts`에 집중
 - 유틸리티 함수는 `src/utils/`에 분리
 

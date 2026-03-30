@@ -15,7 +15,7 @@ AWGDAS는 **결과물(게임)이 아닌, 자율 에이전트 조직이 안정적
 - **자율 루프 제어** — 기획↔개발↔QA 반복에서 무한 루프와 스코프 확장을 방지하고, 정의된 완료 조건(DoD)을 충족하면 자동 종료
 - **명세 기반 개발** — Round Spec을 Single Source of Truth로 사용해 모든 판단을 문서화된 기준에 고정
 - **검증 가능한 품질 게이트** — 추상적 평가("잘 동작한다") 대신 Yes/No 판정이 가능한 Acceptance Criteria로 통과 여부 결정
-- **불변 상태 머신** — 에이전트 간 상태 전이를 순수 함수 기반 FSM으로 관리하여 예측 가능한 파이프라인 흐름 보장
+- **불변 상태 머신** — 상태 기반 디스패치 루프와 순수 함수 FSM으로 예측 가능한 파이프라인 흐름 보장
 
 ---
 
@@ -57,15 +57,15 @@ PL ──RoundSpec──▶ Planner ──FeatureBreakdown──▶ Developer �
 
 ### 상태 머신
 
-8-phase 불변 FSM으로 파이프라인 흐름을 제어한다. 전이는 순수 함수 `transition(state, nextPhase)`로만 수행되며, 유효하지 않은 전이는 즉시 예외를 발생시킨다.
+8-phase 불변 FSM으로 파이프라인 흐름을 제어한다. 각 페이즈에 등록된 핸들러를 `runPhase(state, context)`로 디스패치하며, 핸들러 내부에서 `transition()`으로 다음 페이즈로 전이한다. 유효하지 않은 전이는 즉시 예외를 발생시킨다.
 
 ```
 PL_INIT → PLANNER_DEFINE → DEV_IMPLEMENT → QA_REVIEW
                                                 ↓
                                 [PASS] → RELEASE → DONE
                                 [REJECT] → RETRY_CHECK → DEV_IMPLEMENT (최대 2회)
-                                                    ↓ (초과)
-                                                  FAILED
+                                                ↓ (초과)
+                                              FAILED
 ```
 
 ---
@@ -116,6 +116,7 @@ Developer가 파일을 생성/수정/삭제할 때마다 `manifest.json`을 즉�
 |------|------|------|
 | 유틸리티 단위 | 상태 머신, 파일 I/O, manifest, JSON 파싱 | 순수 함수 테스트 |
 | 에이전트 단위 | PL, Planner, Developer, QA 각각 | API mock (`vi.mock`) 기반 |
+| 핸들러 통합 | 페이즈 핸들러 디스패치 (PASS/RETRY/FAIL) | 에이전트 mock + 실제 상태 머신 |
 | 파이프라인 통합 | PL→Planner→Dev→QA 데이터 계약 | 실제 상태 머신 + 에이전트 mock |
 | E2E | 전체 파이프라인 (PASS/RETRY/FAIL) | 실제 API 호출 |
 
@@ -163,15 +164,17 @@ src/
 │   ├── developerAgent.ts          # Developer — tool_use 루프, 파일 I/O
 │   ├── qaAgent.ts                 # QA — manifest 무결성 + AC 판정
 │   └── prompts/                   # 에이전트별 system prompt
-├── types/index.ts             # 공유 인터페이스 (RoundSpec, DevResult 등)
+├── pipeline/
+│   └── phaseHandlers.ts           # 페이즈별 핸들러 등록 (PL_INIT~RELEASE)
+├── types/index.ts             # 공유 인터페이스 (RoundSpec, DevResult, PipelineContext 등)
 ├── utils/
 │   ├── anthropicClient.ts         # API 클라이언트 (재시도, AbortController, AgentCallError)
 │   ├── responseParser.ts          # JSON 단계적 복구 + 필드 검증
-│   ├── roundStateMachine.ts       # 불변 FSM (transition, canRetry)
+│   ├── roundStateMachine.ts       # 불변 FSM (transition, runPhase, 핸들러 레지스트리)
 │   ├── fileManager.ts             # 게임 파일 I/O
 │   ├── manifest.ts                # manifest.json CRUD
 │   └── logger.ts                  # 구조화 로거
-└── index.ts                   # 진입점 — 파이프라인 루프 + graceful shutdown
+└── index.ts                   # 진입점 — 상태 머신 디스패치 루프 + graceful shutdown
 ```
 
 ---

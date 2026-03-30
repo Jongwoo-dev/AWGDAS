@@ -81,7 +81,14 @@ QA_REVIEW
    ↓
 [PASS] → RELEASE → DONE
 [REJECT] → RETRY_CHECK → DEV_IMPLEMENT
+                     ↓ (초과)
+                   FAILED
 ```
+
+### 실행 메커니즘
+
+각 페이즈는 `registerPhaseHandler()`로 핸들러를 등록한다 (`src/pipeline/phaseHandlers.ts`).
+파이프라인은 `while (!isTerminalPhase(state.phase))` 루프에서 `runPhase(state, context)`로 현재 페이즈의 핸들러를 디스패치한다. 핸들러는 에이전트를 호출하고, 결과를 상태에 저장한 뒤, `transition()`으로 다음 페이즈로 전이한 상태를 반환한다.
 
 ---
 
@@ -280,7 +287,7 @@ interface QAResult { // QA → PL
 
 ---
 ## 16. 상태 관리
-메모리 내 객체로 관리 (파일 저장 안 함). 상태 전환은 **PL만** 수행.
+메모리 내 객체로 관리 (파일 저장 안 함). 상태 전이는 `transition()` 함수로만 수행.
 
 ```typescript
 interface RoundState {
@@ -289,8 +296,16 @@ interface RoundState {
   currentSpec: RoundSpec | null; currentBreakdown: FeatureBreakdown | null;
   currentDevResult: DevResult | null; currentQAResult: QAResult | null;
 }
+
+interface PipelineContext {
+  readonly gameDescription: string;
+  readonly gameName: string;
+}
 ```
-전환은 섹션 3 상태 머신 준수. `FAILED`는 섹션 3에 미표기된 확장 상태로, 섹션 4 Retry 초과 시 진입한다. PASS→`RELEASE`→`DONE`, REJECT→`RETRY_CHECK`→재시도 가능 시 `DEV_IMPLEMENT`/초과 시 `FAILED`.
+
+`PipelineContext`는 상태 머신 외부의 불변 데이터를 담는다. 각 페이즈 핸들러는 `(state: RoundState, context: PipelineContext) => Promise<RoundState>` 시그니처를 따르며, `src/pipeline/phaseHandlers.ts`에서 `registerPhaseHandler()`로 등록된다.
+
+전환은 섹션 3 상태 머신 준수. PASS→`RELEASE`→`DONE`, REJECT→`RETRY_CHECK`→재시도 가능 시 `DEV_IMPLEMENT`/초과 시 `FAILED`.
 
 ---
 ## 17. 에러 핸들링
